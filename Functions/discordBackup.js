@@ -135,6 +135,25 @@ async function zipDirectory(sourceDir, zipFilePath) {
 	});
 }
 
+async function splitFileIntoParts(filePath, partSizeBytes, outputDir) {
+	if (!Number.isFinite(partSizeBytes) || partSizeBytes <= 0) {
+		throw new Error("partSizeBytes must be a positive number");
+	}
+	await fsp.mkdir(outputDir, { recursive: true });
+	const baseName = path.basename(filePath);
+	const parts = [];
+	let index = 1;
+	const stream = fs.createReadStream(filePath, { highWaterMark: partSizeBytes });
+	for await (const chunk of stream) {
+		const partName = `${baseName}.part${String(index).padStart(3, "0")}`;
+		const partPath = path.join(outputDir, partName);
+		await fsp.writeFile(partPath, chunk);
+		parts.push(partPath);
+		index++;
+	}
+	return parts;
+}
+
 async function listDbNamesForStats(client, options = {}) {
 	const dbName = options.dbName;
 	const includeSystemDbs = !!options.includeSystemDbs;
@@ -465,8 +484,34 @@ async function runDiscordBackup(client, options = {}) {
 
 	let uploaded = 0;
 	const skipped = [];
+	let splitParts = [];
 	if (zipBytes > maxFileBytes) {
-		skipped.push(`${path.basename(zipFilePath)} (${formatBytes(zipBytes)})`);
+		const partsDir = path.join(runOutDir, "zip-parts");
+		splitParts = await splitFileIntoParts(zipFilePath, maxFileBytes, partsDir);
+		await postDiscordMessage(
+			webhookUrl,
+			`Zip exceeded ${maxFileMb}MB, split into ${splitParts.length} part(s) for upload.`
+		);
+		let partIndex = 0;
+		for (const partPath of splitParts) {
+			partIndex++;
+			const partSize = (await fsp.stat(partPath)).size;
+			await postDiscordFile(
+				webhookUrl,
+				partPath,
+				`Backup zip part ${partIndex}/${splitParts.length} | ${path.basename(
+					partPath
+				)} | ${formatBytes(partSize)}`
+			);
+			uploaded++;
+			await sleep(350);
+		}
+		await postDiscordMessage(
+			webhookUrl,
+			`To restore split zip: cat ${path.basename(zipFilePath)}.part* > ${path.basename(
+				zipFilePath
+			)}`
+		);
 	} else {
 		await postDiscordFile(
 			webhookUrl,
@@ -476,16 +521,11 @@ async function runDiscordBackup(client, options = {}) {
 		uploaded = 1;
 	}
 
-	if (skipped.length) {
-		await postDiscordMessage(
-			webhookUrl,
-			`Zip upload skipped (max ${maxFileMb}MB). Local zip: ${zipFilePath}`
-		);
-	}
-
 	await postDiscordMessage(
 		webhookUrl,
-		`Backup scheduler interval: ${intervalHours}h | uploaded=${uploaded} | local backup dir=${runOutDir}`
+		`Backup scheduler interval: ${intervalHours}h | uploaded=${uploaded}${
+			splitParts.length ? ` (split parts=${splitParts.length})` : ""
+		} | local backup dir=${runOutDir}`
 	);
 
 	return {
@@ -500,6 +540,7 @@ async function runDiscordBackup(client, options = {}) {
 		storageDelta,
 		summaryFilePath,
 		previousSummaryPath: latestSummaryPath,
+		splitParts,
 		uploaded,
 		skipped,
 		maxFileMb,

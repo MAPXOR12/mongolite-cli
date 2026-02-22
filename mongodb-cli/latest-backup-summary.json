@@ -1,0 +1,88 @@
+{
+  "createdAt": "2026-02-22T14:09:13.386Z",
+  "scope": "all-databases",
+  "dbName": null,
+  "runOutDir": "/root/mongolite-cli/mongodb-cli/backup-2026-02-22T14-08-34-386Z",
+  "zipFilePath": "/root/mongolite-cli/mongodb-cli/backup-2026-02-22T14-08-34-386Z.zip",
+  "rawBackupBytes": 126770089,
+  "zipBytes": 59972289,
+  "compressionSavedBytes": 66797800,
+  "compressionPercent": 52.69,
+  "storage": {
+    "perDb": [
+      {
+        "db": "sample_mflix",
+        "collections": 6,
+        "dataSize": 101109034,
+        "storageSize": 101347328,
+        "indexSize": 20426752,
+        "totalSize": 121774080
+      },
+      {
+        "db": "test",
+        "collections": 31,
+        "dataSize": 5327414,
+        "storageSize": 3031040,
+        "indexSize": 1306624,
+        "totalSize": 4337664
+      },
+      {
+        "db": "voicetracker",
+        "collections": 4,
+        "dataSize": 429355,
+        "storageSize": 360448,
+        "indexSize": 520192,
+        "totalSize": 880640
+      }
+    ],
+    "errors": [],
+    "totals": {
+      "dataSize": 106865803,
+      "storageSize": 104738816,
+      "indexSize": 22253568,
+      "totalSize": 126992384
+    },
+    "generatedAt": "2026-02-22T14:09:13.386Z"
+  },
+  "storageDelta": {
+    "current": 126992384,
+    "previous": 0,
+    "diff": 126992384,
+    "direction": "increased",
+    "absoluteDiff": 126992384
+  },
+  "zipDelta": {
+    "current": 59972289,
+    "previous": 0,
+    "diff": 59972289,
+    "direction": "increased",
+    "absoluteDiff": 59972289
+  },
+  "topDatabases": [
+    {
+      "db": "sample_mflix",
+      "collections": 6,
+      "dataSize": 101109034,
+      "storageSize": 101347328,
+      "indexSize": 20426752,
+      "totalSize": 121774080
+    },
+    {
+      "db": "test",
+      "collections": 31,
+      "dataSize": 5327414,
+      "storageSize": 3031040,
+      "indexSize": 1306624,
+      "totalSize": 4337664
+    },
+    {
+      "db": "voicetracker",
+      "collections": 4,
+      "dataSize": 429355,
+      "storageSize": 360448,
+      "indexSize": 520192,
+      "totalSize": 880640
+    }
+  ],
+  "fileCount": 41
+}

@@ -339,13 +339,17 @@ async function main() {
 									(1024 * 1024)
 							  ).toFixed(2)}MB`
 							: "";
+					const splitInfo =
+						result.splitParts && result.splitParts.length
+							? ` | split-parts=${result.splitParts.length}`
+							: "";
 					console.log(
 						`Backup zip processed: uploaded=${result.uploaded}, raw=${(
 							result.rawBackupBytes /
 							(1024 * 1024)
 						).toFixed(2)}MB, zip=${(result.zipBytes / (1024 * 1024)).toFixed(
 							2
-						)}MB${storageInfo}${deltaInfo}${skippedInfo}. Local path: '${result.runOutDir}'.`
+						)}MB${storageInfo}${deltaInfo}${splitInfo}${skippedInfo}. Local path: '${result.runOutDir}'.`
 					);
 				};
 

@@ -16,7 +16,7 @@ Powerful colorful CLI for MongoDB: databases, users, roles, collections, dump/im
 - 🔑 Role assignment via names or numeric codes
 - 📦 List & delete collections
 - 💾 Dump/import single or all databases
-- 📬 Discord webhook backup uploader with scheduler (every 4h by default)
+- 📬 Discord webhook backup uploader with scheduler (every 4h by default), zipped backups + storage/decrease report
 - 🌐 Atlas / VPS / Local connection support
 - 🔐 Auth & authSource handling
 - 🔧 Connection and user auth testing
@@ -125,6 +125,13 @@ mongocli backup-discord --once
 mongocli backup-discord --db mydb --interval-hours 4 --out-dir ./mongodb-cli
 ```
 `backup-discord` runs one backup immediately, then continues every 4 hours by default.
+It sends:
+- one `.zip` backup file to the Discord channel webhook
+- backup date/time, current DB storage, and decrease/increase info vs previous backup
+- if zip is larger than your max upload size, it auto-splits and sends parts
+
+Local metadata file:
+- `./mongodb-cli/latest-backup-summary.json` (last run summary for delta comparison)
 
 ### Utility
 ```bash
