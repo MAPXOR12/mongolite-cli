@@ -26,6 +26,7 @@
     "list-collections": "node mongodb.js list-collections",
     "delete-collection": "node mongodb.js delete-collection",
     "dump": "node mongodb.js dump",
+    "backup-discord": "node mongodb.js backup-discord",
     "import": "node mongodb.js import",
     "change-password": "node mongodb.js change-password",
     "set-roles": "node mongodb.js set-roles",

@@ -16,6 +16,7 @@ const { listDB } = require("./Functions/listDB.js");
 const { listAllUsers } = require("./Functions/allUsers.js");
 const { dumpDB, dumpAllDatabases } = require("./Functions/dump.js");
 const { importDB, importAllDatabases } = require("./Functions/import.js");
+const { runDiscordBackup } = require("./Functions/discordBackup.js");
 
 function usage() {
 	console.log(
@@ -47,6 +48,7 @@ function usage() {
 			colors.white("  mongocli ") + colors.blue("dump all") + colors.gray(" [outDir] ") + colors.magenta("[--include-system-dbs] [--include-system-collections]"),
 			colors.white("  mongocli ") + colors.blue("import db") + colors.gray(" <dbName> <dir> ") + colors.magenta("[--drop] [--upsert]"),
 			colors.white("  mongocli ") + colors.blue("import all") + colors.gray(" <rootDir> ") + colors.magenta("[--drop] [--upsert]"),
+			colors.white("  mongocli ") + colors.blue("backup-discord") + colors.gray(" [--once] [--db <dbName>] [--out-dir <dir>]") + colors.magenta(" [--interval-hours <4>] [--webhook <url>] [--max-file-mb <8>] [--include-system-dbs] [--include-system-collections]"),
 			"",
 			colors.green.bold("Help:"),
 			colors.white("  mongocli ") + colors.blue("help"),
@@ -61,6 +63,9 @@ function usage() {
 			colors.cyan("  DB_PORT") + colors.gray(" (default: 27017)"),
 			colors.cyan("  ADMIN_USERNAME, ADMIN_PASSWORD") + colors.gray(" (if auth is enabled)"),
 			colors.cyan("  AUTH_DB") + colors.gray(" (default: admin)"),
+			colors.cyan("  DISCORD_WEBHOOK_URL") + colors.gray(" (required for backup-discord)"),
+			colors.cyan("  DISCORD_BACKUP_INTERVAL_HOURS") + colors.gray(" (default: 4)"),
+			colors.cyan("  DISCORD_BACKUP_OUT_DIR") + colors.gray(" (default: ./mongodb-cli)"),
 		].join("\n")
 	);
 }
@@ -125,6 +130,55 @@ async function withClient(cb) {
 	} finally {
 		await client.close().catch(() => {});
 	}
+}
+
+function sleep(ms) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseBackupDiscordArgs(argv = []) {
+	const parsed = {};
+	for (let i = 0; i < argv.length; i++) {
+		const arg = argv[i];
+		if (arg === "--once") {
+			parsed.once = true;
+			continue;
+		}
+		if (arg === "--include-system-dbs") {
+			parsed.includeSystemDbs = true;
+			continue;
+		}
+		if (arg === "--include-system-collections") {
+			parsed.includeSystemCollections = true;
+			continue;
+		}
+		if (arg === "--db" && argv[i + 1]) {
+			parsed.dbName = argv[i + 1];
+			i++;
+			continue;
+		}
+		if (arg === "--out-dir" && argv[i + 1]) {
+			parsed.outDir = argv[i + 1];
+			i++;
+			continue;
+		}
+		if (arg === "--webhook" && argv[i + 1]) {
+			parsed.webhookUrl = argv[i + 1];
+			i++;
+			continue;
+		}
+		if (arg === "--interval-hours" && argv[i + 1]) {
+			parsed.intervalHours = Number(argv[i + 1]);
+			i++;
+			continue;
+		}
+		if (arg === "--max-file-mb" && argv[i + 1]) {
+			parsed.maxFileMb = Number(argv[i + 1]);
+			i++;
+			continue;
+		}
+	}
+	return parsed;
 }
 
 async function main() {
@@ -241,6 +295,82 @@ async function main() {
 				}
 				usage();
 				break;
+			}
+			case "backup-discord": {
+				const parsed = parseBackupDiscordArgs(args);
+				const webhookUrl = parsed.webhookUrl || process.env.DISCORD_WEBHOOK_URL;
+				if (!webhookUrl) {
+					throw new Error("Missing Discord webhook URL. Use --webhook or set DISCORD_WEBHOOK_URL.");
+				}
+
+				const intervalHours =
+					parsed.intervalHours !== undefined
+						? parsed.intervalHours
+						: Number(process.env.DISCORD_BACKUP_INTERVAL_HOURS || 4);
+				if (!Number.isFinite(intervalHours) || intervalHours <= 0) {
+					throw new Error("interval-hours must be a positive number.");
+				}
+
+				const runBackupCycle = async () => {
+					const result = await withClient((client) =>
+						runDiscordBackup(client, {
+							webhookUrl,
+							dbName: parsed.dbName,
+							outDir: parsed.outDir,
+							includeSystemDbs: parsed.includeSystemDbs,
+							includeSystemCollections: parsed.includeSystemCollections,
+							maxFileMb: parsed.maxFileMb,
+							intervalHours,
+						})
+					);
+					const skippedInfo = result.skipped.length
+						? ` | skipped=${result.skipped.join(", ")}`
+						: "";
+					const storageInfo =
+						result.storage && result.storage.totals
+							? ` | db-storage=${(result.storage.totals.totalSize / (1024 * 1024)).toFixed(
+									2
+							  )}MB`
+							: "";
+					const deltaInfo =
+						result.storageDelta && result.storageDelta.direction !== "unchanged"
+							? ` | storage-${result.storageDelta.direction}=${(
+									result.storageDelta.absoluteDiff /
+									(1024 * 1024)
+							  ).toFixed(2)}MB`
+							: "";
+					console.log(
+						`Backup zip processed: uploaded=${result.uploaded}, raw=${(
+							result.rawBackupBytes /
+							(1024 * 1024)
+						).toFixed(2)}MB, zip=${(result.zipBytes / (1024 * 1024)).toFixed(
+							2
+						)}MB${storageInfo}${deltaInfo}${skippedInfo}. Local path: '${result.runOutDir}'.`
+					);
+				};
+
+				await runBackupCycle();
+
+				if (parsed.once) {
+					break;
+				}
+
+				console.log(
+					`Discord backup scheduler running every ${intervalHours} hour(s). Press Ctrl+C to stop.`
+				);
+				const intervalMs = Math.round(intervalHours * 60 * 60 * 1000);
+				while (true) {
+					await sleep(intervalMs);
+					try {
+						await runBackupCycle();
+					} catch (cycleError) {
+						console.error(
+							`Backup cycle failed: ${
+								(cycleError && cycleError.message) || String(cycleError)
+							}`
+						);
+					}
+				}
 			}
 			case "setup": {
 				const [dbName, username, password, rolesCsv] = args;
@@ -392,4 +522,3 @@ if (require.main === module) {
 }
 
 module.exports = { getAdminUri, withClient };
-

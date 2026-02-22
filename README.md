@@ -16,6 +16,7 @@ Powerful colorful CLI for MongoDB: databases, users, roles, collections, dump/im
 - 🔑 Role assignment via names or numeric codes
 - 📦 List & delete collections
 - 💾 Dump/import single or all databases
+- 📬 Discord webhook backup uploader with scheduler (every 4h by default)
 - 🌐 Atlas / VPS / Local connection support
 - 🔐 Auth & authSource handling
 - 🔧 Connection and user auth testing
@@ -82,6 +83,7 @@ mongocli dump db production ./backup/
 mongocli import db development ./backup/production --drop
 mongocli create-user reporting report_user "report_pass" read
 mongocli set-roles reporting report_user read,dbAdmin
+mongocli backup-discord --once --out-dir ./mongodb-cli
 ```
 
 ## 📚 Commands
@@ -114,7 +116,16 @@ mongocli dump db <dbName> [outDir] [--include-system-collections]
 mongocli dump all [outDir] [--include-system-dbs] [--include-system-collections]
 mongocli import db <dbName> <dir> [--drop] [--upsert]
 mongocli import all <rootDir> [--drop] [--upsert]
+mongocli backup-discord [--once] [--db <dbName>] [--out-dir <dir>] [--interval-hours <n>] [--webhook <url>] [--max-file-mb <n>] [--include-system-dbs] [--include-system-collections]
 ```
+### Discord Backup Scheduler
+```bash
+mongocli backup-discord
+mongocli backup-discord --once
+mongocli backup-discord --db mydb --interval-hours 4 --out-dir ./mongodb-cli
+```
+`backup-discord` runs one backup immediately, then continues every 4 hours by default.
+
 ### Utility
 ```bash
 mongocli connection --host <host> --port <port> --user <user>
@@ -134,6 +145,13 @@ DB_PORT=27017
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=your_password
 AUTH_DB=admin
+DISCORD_WEBHOOK_URL=
+DISCORD_BACKUP_INTERVAL_HOURS=4
+DISCORD_BACKUP_OUT_DIR=./mongodb-cli
+DISCORD_BACKUP_DB=
+DISCORD_BACKUP_INCLUDE_SYSTEM_DBS=false
+DISCORD_BACKUP_INCLUDE_SYSTEM_COLLECTIONS=false
+DISCORD_BACKUP_MAX_FILE_MB=8
 ```
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -143,6 +161,13 @@ AUTH_DB=admin
 | ADMIN_USERNAME | - | Admin username |
 | ADMIN_PASSWORD | - | Admin password |
 | AUTH_DB | admin | Authentication database |
+| DISCORD_WEBHOOK_URL | - | Discord webhook target for backup uploads |
+| DISCORD_BACKUP_INTERVAL_HOURS | 4 | Backup scheduler interval in hours |
+| DISCORD_BACKUP_OUT_DIR | ./mongodb-cli | Local backup output directory |
+| DISCORD_BACKUP_DB | - | Optional single database scope; empty = all databases |
+| DISCORD_BACKUP_INCLUDE_SYSTEM_DBS | false | Include `admin`, `config`, `local` when dumping all DBs |
+| DISCORD_BACKUP_INCLUDE_SYSTEM_COLLECTIONS | false | Include `system.*` collections |
+| DISCORD_BACKUP_MAX_FILE_MB | 8 | Max upload size per file sent to Discord |
 
 **⚠️ Password Special Characters:** If your password contains special characters (#, !, @, %, etc.), wrap it in quotes:
 ```env
@@ -199,4 +224,3 @@ Use GitHub Issues for bugs & feature requests.
 
 ## 📄 License
 MIT License (see `LICENSE`).
-
